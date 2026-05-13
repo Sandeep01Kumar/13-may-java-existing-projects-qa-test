@@ -148,13 +148,10 @@ public class AuthService {
      * <p>The flow is:</p>
      * <ol>
      *   <li>Reject the request with {@link IllegalArgumentException} if the
-     *       username already exists. The project-wide
-     *       {@code GlobalExceptionHandler @RestControllerAdvice} intercepts
-     *       this exception and emits HTTP {@code 400 Bad Request} with a
-     *       sanitised {@code ResponseStructure}-shaped body, giving the
-     *       caller a clean error path without surfacing a raw
-     *       {@code DataIntegrityViolationException} from the
-     *       database-level {@code UNIQUE} constraint on {@code app_user.username}.</li>
+     *       username already exists. The exception propagates through Spring's
+     *       default error pipeline; the service-layer check still avoids
+     *       relying solely on the database-level {@code UNIQUE} constraint on
+     *       {@code app_user.username} for the common duplicate-username case.</li>
      *   <li>Hash the raw plaintext password via
      *       {@link PasswordEncoder#encode(CharSequence)} and discard the
      *       plaintext.</li>
@@ -176,14 +173,14 @@ public class AuthService {
      *
      * <p><strong>Anti-enumeration:</strong> the exception message intentionally
      * does NOT echo the submitted username because that would let an
-     * attacker probe the user-store via the registration endpoint (see CP2
-     * issue #1). The message {@code "Registration request invalid"} is
-     * deliberately generic and indistinguishable from other client-input
-     * problems so the registration surface offers the same anti-enumeration
-     * posture as the login endpoint.</p>
+     * attacker probe the user-store via the registration endpoint. The
+     * message {@code "Registration request invalid"} is deliberately generic
+     * and indistinguishable from other client-input problems so the
+     * registration surface offers the same anti-enumeration posture as the
+     * login endpoint.</p>
      *
-     * @param dto the validated request body carrying the desired username,
-     *            raw (plaintext) password, and role string; must not be
+     * @param dto the request body carrying the desired username, raw
+     *            (plaintext) password, and role string; must not be
      *            {@code null}
      * @return a {@link ResponseStructure} envelope whose {@code data}
      *         payload is the persisted username, {@code statusCode} is
@@ -191,8 +188,7 @@ public class AuthService {
      *         {@code "User registered successfully"}
      * @throws IllegalArgumentException if a user with the supplied username
      *                                  already exists in the {@code app_user}
-     *                                  table; mapped to HTTP {@code 400} by
-     *                                  {@code GlobalExceptionHandler}
+     *                                  table
      */
     public ResponseStructure<String> register(RegisterRequestDto dto) {
         System.out.println("[AuthService] register invoked for username=" + dto.getUsername());

@@ -33,10 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <h2>Slice configuration</h2>
  * <ul>
  *   <li>{@code @WebMvcTest(controllers = AuthController.class)} &mdash;
- *       narrows the Spring context to ONLY {@link AuthController}, the MVC
- *       infrastructure (Jackson, validator), and the {@code @RestControllerAdvice}
- *       beans. {@code ProductController}, {@code StudentController}, JPA, MySQL,
- *       and JWT minting are all excluded.</li>
+ *       narrows the Spring context to ONLY {@link AuthController} and the MVC
+ *       infrastructure (Jackson serialisation). {@code ProductController},
+ *       {@code StudentController}, JPA, MySQL, and JWT minting are all
+ *       excluded.</li>
  *   <li>{@code @AutoConfigureMockMvc(addFilters = false)} &mdash; disables the
  *       Spring Security filter chain in the slice so MockMvc requests are
  *       NOT pre-empted with 401/403 before reaching the controller method.</li>
@@ -46,21 +46,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *       stubbed envelopes without invoking any real business logic, password
  *       hashing, persistence, or JWT minting.</li>
  * </ul>
- *
- * <h2>Test-data note (production-validation alignment)</h2>
- * <p>{@link RegisterRequestDto} carries Jakarta Bean Validation constraints
- * ({@code @NotBlank} and {@code @Size(min = 8, max = 100)} on the password
- * field) which are evaluated by Spring MVC at the controller boundary because
- * the {@code spring-boot-starter-validation} dependency is on the classpath
- * and the controller method declares {@code @Valid @RequestBody}. The
- * register-test payload therefore uses an 8-character password that satisfies
- * the production validation rules so the request reaches the (mocked)
- * service layer and the controller emits the expected HTTP 201 envelope;
- * a shorter password would be rejected with HTTP 400 by
- * {@code GlobalExceptionHandler} before the controller method body runs.
- * {@link LoginRequestDto} carries only {@code @NotBlank} (no length
- * constraint) so the login test can use a shorter password without any
- * validation interference.</p>
  *
  * <h2>Rule compliance (AAP &sect;0.7.1)</h2>
  * <ul>
@@ -154,10 +139,8 @@ class AuthControllerTest {
      *
      * <p>Test sequence:</p>
      * <ol>
-     *   <li>Build a {@link RegisterRequestDto} whose field values satisfy
-     *       the production Jakarta Bean Validation constraints (username
-     *       length in [3, 50]; password length in [8, 100]; role length
-     *       in [1, 20]).</li>
+     *   <li>Build a {@link RegisterRequestDto} with deterministic, non-blank
+     *       values for username, password, and role.</li>
      *   <li>Build a stub {@link ResponseStructure} envelope that mirrors the
      *       shape the real {@link AuthService#register(RegisterRequestDto)}
      *       would produce on success.</li>
@@ -176,12 +159,7 @@ class AuthControllerTest {
      */
     @Test
     void register_returns201_onSuccess() throws Exception {
-        // The password "password" (length 8) satisfies the production
-        // @Size(min = 8, max = 100) constraint declared on
-        // RegisterRequestDto.password. Using a shorter literal would be
-        // rejected by Spring MVC's Bean Validation step BEFORE the controller
-        // method runs, surfacing as HTTP 400 (via GlobalExceptionHandler) and
-        // failing this test.
+        // Deterministic, non-blank values for the three DTO fields.
         RegisterRequestDto dto = new RegisterRequestDto("alice", "password", "USER");
 
         ResponseStructure<String> stubResponse = new ResponseStructure<>();
@@ -209,12 +187,10 @@ class AuthControllerTest {
      * the stubbed envelope (with a nested {@link AuthResponseDto}) is
      * wrapped in a {@code 200 OK} response with the expected JSON shape.
      *
-     * <p>The {@link LoginRequestDto} carries only {@code @NotBlank}
-     * constraints (no length bounds), so any non-blank password value
-     * satisfies the validation step. The test uses a deliberately short
-     * placeholder password to make clear that the controller never inspects
-     * the password contents &mdash; that responsibility is delegated entirely
-     * to the (mocked) {@link AuthService}.</p>
+     * <p>The test uses a deliberately short placeholder password to make
+     * clear that the controller never inspects the password contents
+     * &mdash; that responsibility is delegated entirely to the (mocked)
+     * {@link AuthService}.</p>
      *
      * <p>The nested {@link AuthResponseDto} assertions verify that the JSON
      * serialization preserves all four fields (token, username, role,

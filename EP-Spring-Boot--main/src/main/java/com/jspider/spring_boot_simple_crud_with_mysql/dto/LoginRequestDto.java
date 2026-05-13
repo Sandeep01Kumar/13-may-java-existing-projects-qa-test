@@ -1,6 +1,5 @@
 package com.jspider.spring_boot_simple_crud_with_mysql.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -41,16 +40,14 @@ public class LoginRequestDto {
      * unique {@code username} column on the {@code User} entity / {@code
      * app_user} table.
      *
-     * <p>{@code @NotBlank} rejects {@code null}, empty string, and
-     * whitespace-only inputs at the Spring MVC layer (via the {@code @Valid}
-     * annotation on {@code AuthController#login}). Without this guard, an
-     * empty username would flow through to
-     * {@code AuthenticationManager.authenticate(...)} and surface as a
-     * generic {@code BadCredentialsException} → HTTP 401. The 400 we emit
-     * instead is a cleaner client signal because the request is
-     * syntactically invalid, not semantically wrong.</p>
+     * <p>If an empty or whitespace-only value is submitted, the request
+     * flows through to {@code AuthenticationManager.authenticate(...)} and
+     * surfaces as a generic {@code BadCredentialsException} which is then
+     * mapped to HTTP {@code 401 Unauthorized} by
+     * {@code JwtAuthenticationEntryPoint}. This anti-enumeration response
+     * is intentionally indistinguishable from any other failed-credential
+     * outcome.</p>
      */
-    @NotBlank(message = "username must not be blank")
     private String username;
 
     /**
@@ -59,12 +56,6 @@ public class LoginRequestDto {
      * {@code DaoAuthenticationProvider} during
      * {@code AuthenticationManager.authenticate(...)}. It is NEVER persisted
      * in plaintext and MUST NOT be logged.
-     *
-     * <p>{@code @NotBlank} rejects empty / whitespace-only credentials at
-     * the Spring MVC layer so the request is failed fast with HTTP 400
-     * rather than flowing through Spring Security's authentication
-     * machinery and producing an anti-enumeration 401.</p>
      */
-    @NotBlank(message = "password must not be blank")
     private String password;
 }

@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -197,30 +196,15 @@ public class SecurityConfig {
      *
      * <p>Configuration steps (in declaration order):</p>
      * <ol>
-     *   <li><strong>CORS integration</strong> &mdash; delegates CORS pre-flight
-     *       (HTTP {@code OPTIONS}) handling to Spring MVC's
-     *       {@code CrossOriginHandler} (driven by the existing
-     *       {@code @CrossOrigin} annotations on the controllers, e.g.
-     *       {@code @CrossOrigin(value = "")} on {@code ProductController}).
-     *       Without this call, Spring Security 6.x rejects pre-flight requests
-     *       with HTTP {@code 401} before they reach the MVC layer, which is an
-     *       observable regression versus the pre-feature behaviour
-     *       (AAP &sect;0.7.5: "Existing CORS configuration is preserved").</li>
      *   <li><strong>CSRF disabled</strong> &mdash; JWT-based stateless REST
      *       APIs do not use server-side sessions or cookie-bearing auth, so
      *       CSRF tokens have no role.</li>
      *   <li><strong>Authorisation rules</strong> &mdash; {@code /auth/**} (the
      *       new public registration and login endpoints), {@code /swagger-ui/**},
-     *       {@code /v3/api-docs/**}, {@code /swagger-ui.html}, and
-     *       {@code /error} are anonymous-accessible. The {@code /error}
-     *       endpoint is included because Spring Boot internally forwards
-     *       unmapped URLs (e.g. {@code GET /totally/random/path}) and
-     *       unhandled exceptions to {@code /error} via the
-     *       {@code BasicErrorController}; without permitting that path, the
-     *       security filter chain re-evaluates the internal forward and emits
-     *       {@code 401 Unauthorized} instead of the expected {@code 404 Not
-     *       Found}. Every other request (including {@code /product/**} and
-     *       {@code /student/**}) requires authentication.</li>
+     *       {@code /v3/api-docs/**}, and {@code /swagger-ui.html} are
+     *       anonymous-accessible. Every other request (including
+     *       {@code /product/**} and {@code /student/**}) requires
+     *       authentication.</li>
      *   <li><strong>Stateless session policy</strong> &mdash; mandatory for
      *       the JWT model so Spring Security never creates an
      *       {@code HttpSession}.</li>
@@ -251,10 +235,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         System.out.println("[SecurityConfig] securityFilterChain bean created");
         http
-            .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/error").permitAll()
+                .requestMatchers("/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(eh -> eh.authenticationEntryPoint(jwtAuthenticationEntryPoint))
