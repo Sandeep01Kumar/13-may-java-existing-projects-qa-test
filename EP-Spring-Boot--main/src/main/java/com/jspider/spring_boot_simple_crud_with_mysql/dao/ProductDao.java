@@ -15,6 +15,7 @@ import com.jspider.spring_boot_simple_crud_with_mysql.entity.Product;
 import com.jspider.spring_boot_simple_crud_with_mysql.repository.ProductRepository;
 
 @Repository
+// Rule Applied
 public class ProductDao {
 
 	@Autowired

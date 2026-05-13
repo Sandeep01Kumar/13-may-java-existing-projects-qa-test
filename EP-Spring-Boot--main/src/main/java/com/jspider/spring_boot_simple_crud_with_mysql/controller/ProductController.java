@@ -28,6 +28,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping(value = "/product")
 @CrossOrigin(value = "")
 @Tag(name = "productcontroller", description = "this is controller class")
+// Rule Applied
 public class ProductController {
 
 	@Autowired

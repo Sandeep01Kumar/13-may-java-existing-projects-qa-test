@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.info.Info;
 						)
 				)
 		)
+// Rule Applied
 public class SpringBootSimpleCrudWithMysqlApplication {
 
 	public static void main(String[] args) {

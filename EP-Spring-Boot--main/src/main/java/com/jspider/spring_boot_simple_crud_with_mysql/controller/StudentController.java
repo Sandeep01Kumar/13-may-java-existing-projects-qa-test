@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(value = "/student")
+// Rule Applied
 public class StudentController {
 
 	@GetMapping(value = "/getTodayDate")
