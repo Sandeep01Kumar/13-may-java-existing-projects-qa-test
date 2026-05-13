@@ -74,6 +74,14 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- Bean Validation (Jakarta Validation API + Hibernate Validator); used by
+		     @NotBlank / @Valid on the auth DTOs and controller parameters so that
+		     malformed registration payloads short-circuit at the web layer instead
+		     of propagating arbitrary exceptions into the security chain. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>

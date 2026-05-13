@@ -193,7 +193,30 @@ public class AuthService {
     public ResponseStructure<String> register(RegisterRequestDto dto) {
         System.out.println("[AuthService] register invoked for username=" + dto.getUsername());
 
-        if (userRepository.existsByUsername(dto.getUsername())) {
+        // Defence in depth: the @Valid / @NotBlank constraints on
+        // RegisterRequestDto already short-circuit blank inputs at the
+        // controller boundary. Repeat the guards here so that direct
+        // service-layer callers (tests, future internal callers) cannot
+        // bypass validation. Use trim() because @NotBlank semantically
+        // rejects "after trim" empty strings as well; this keeps the
+        // service contract consistent with the DTO contract.
+        if (dto.getUsername() == null || dto.getUsername().trim().isEmpty()) {
+            throw new IllegalArgumentException("username must not be blank");
+        }
+        if (dto.getPassword() == null || dto.getPassword().isEmpty()) {
+            throw new IllegalArgumentException("password must not be blank");
+        }
+        if (dto.getRole() == null || dto.getRole().trim().isEmpty()) {
+            throw new IllegalArgumentException("role must not be blank");
+        }
+
+        // Normalise the username by stripping surrounding whitespace before
+        // the duplicate check and persistence. Without trimming, callers
+        // could register "alice" and "  alice  " as two distinct rows even
+        // though they are visually indistinguishable to a human reviewer.
+        String normalisedUsername = dto.getUsername().trim();
+
+        if (userRepository.existsByUsername(normalisedUsername)) {
             // Anti-enumeration: do NOT echo the submitted username back in the
             // exception message (CP2 issue #1). A generic message keeps the
             // response indistinguishable from other client-input rejections so
@@ -202,7 +225,15 @@ public class AuthService {
         }
 
         String hashed = passwordEncoder.encode(dto.getPassword());
-        User user = new User(null, dto.getUsername(), hashed, dto.getRole());
+        // Normalise the role token to upper-case to keep the database
+        // representation consistent regardless of caller casing
+        // (e.g. "user" / "User" / "USER" all persist as "USER"). The
+        // UserDetailsServiceImpl adapter also upper-cases the value when
+        // building the SimpleGrantedAuthority, so this just keeps the
+        // stored value canonical and prevents collation-sensitive
+        // duplicate-role drift in MySQL.
+        String normalisedRole = dto.getRole().trim().toUpperCase();
+        User user = new User(null, normalisedUsername, hashed, normalisedRole);
         User saved = userRepository.save(user);
 
         ResponseStructure<String> response = new ResponseStructure<>();

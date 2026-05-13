@@ -16,6 +16,8 @@ import com.jspider.spring_boot_simple_crud_with_mysql.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import jakarta.validation.Valid;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -33,10 +35,19 @@ import lombok.RequiredArgsConstructor;
  *   <li>No Spring Security primitives &mdash; password hashing,
  *       {@code AuthenticationManager.authenticate(...)}, and JWT minting
  *       are all encapsulated inside {@link AuthService}.</li>
- *   <li>No inline exception handling &mdash;
- *       {@code IllegalArgumentException} (duplicate username) propagates
- *       through Spring's default error pipeline; {@code BadCredentialsException}
- *       bubbles up to {@code JwtAuthenticationEntryPoint} (HTTP {@code 401}).</li>
+ *   <li>No inline exception handling &mdash; client-input exceptions
+ *       (Bean Validation failures, duplicate-username
+ *       {@code IllegalArgumentException}, Jackson
+ *       {@code HttpMessageNotReadableException}, JPA
+ *       {@code DataIntegrityViolationException}) are translated to
+ *       {@code 400 Bad Request} by {@code GlobalExceptionHandler}
+ *       ({@code @RestControllerAdvice}); authentication failures
+ *       (e.g. {@code BadCredentialsException}) continue to bubble up to
+ *       {@code JwtAuthenticationEntryPoint} (HTTP {@code 401}).</li>
+ *   <li>Inbound DTOs are {@code @Valid}-annotated so Bean Validation
+ *       constraints declared on {@code RegisterRequestDto} /
+ *       {@code LoginRequestDto} are enforced before the method body
+ *       runs.</li>
  * </ul>
  *
  * <p>The class-level {@code @RequestMapping("/auth")} is paired with the
@@ -101,7 +112,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
-    public ResponseEntity<ResponseStructure<String>> register(@RequestBody RegisterRequestDto dto) {
+    public ResponseEntity<ResponseStructure<String>> register(@Valid @RequestBody RegisterRequestDto dto) {
         System.out.println("[AuthController] register invoked for username=" + dto.getUsername());
         ResponseStructure<String> body = authService.register(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
@@ -138,7 +149,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and return JWT")
-    public ResponseEntity<ResponseStructure<AuthResponseDto>> login(@RequestBody LoginRequestDto dto) {
+    public ResponseEntity<ResponseStructure<AuthResponseDto>> login(@Valid @RequestBody LoginRequestDto dto) {
         System.out.println("[AuthController] login invoked for username=" + dto.getUsername());
         ResponseStructure<AuthResponseDto> body = authService.login(dto);
         return ResponseEntity.ok(body);
