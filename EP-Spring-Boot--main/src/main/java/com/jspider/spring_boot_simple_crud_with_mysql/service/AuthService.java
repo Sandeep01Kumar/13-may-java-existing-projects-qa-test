@@ -148,8 +148,10 @@ public class AuthService {
      * <p>The flow is:</p>
      * <ol>
      *   <li>Reject the request with {@link IllegalArgumentException} if the
-     *       username already exists. Spring's default exception handling
-     *       converts this into an HTTP {@code 400 Bad Request}, giving the
+     *       username already exists. The project-wide
+     *       {@code GlobalExceptionHandler @RestControllerAdvice} intercepts
+     *       this exception and emits HTTP {@code 400 Bad Request} with a
+     *       sanitised {@code ResponseStructure}-shaped body, giving the
      *       caller a clean error path without surfacing a raw
      *       {@code DataIntegrityViolationException} from the
      *       database-level {@code UNIQUE} constraint on {@code app_user.username}.</li>
@@ -172,6 +174,14 @@ public class AuthService {
      * &mdash; the {@code UNIQUE} constraint on {@code app_user.username} is
      * the ultimate guard against concurrent duplicate insertions.</p>
      *
+     * <p><strong>Anti-enumeration:</strong> the exception message intentionally
+     * does NOT echo the submitted username because that would let an
+     * attacker probe the user-store via the registration endpoint (see CP2
+     * issue #1). The message {@code "Registration request invalid"} is
+     * deliberately generic and indistinguishable from other client-input
+     * problems so the registration surface offers the same anti-enumeration
+     * posture as the login endpoint.</p>
+     *
      * @param dto the validated request body carrying the desired username,
      *            raw (plaintext) password, and role string; must not be
      *            {@code null}
@@ -181,13 +191,18 @@ public class AuthService {
      *         {@code "User registered successfully"}
      * @throws IllegalArgumentException if a user with the supplied username
      *                                  already exists in the {@code app_user}
-     *                                  table
+     *                                  table; mapped to HTTP {@code 400} by
+     *                                  {@code GlobalExceptionHandler}
      */
     public ResponseStructure<String> register(RegisterRequestDto dto) {
         System.out.println("[AuthService] register invoked for username=" + dto.getUsername());
 
         if (userRepository.existsByUsername(dto.getUsername())) {
-            throw new IllegalArgumentException("Username already exists: " + dto.getUsername());
+            // Anti-enumeration: do NOT echo the submitted username back in the
+            // exception message (CP2 issue #1). A generic message keeps the
+            // response indistinguishable from other client-input rejections so
+            // attackers cannot use the register endpoint as a username oracle.
+            throw new IllegalArgumentException("Registration request invalid");
         }
 
         String hashed = passwordEncoder.encode(dto.getPassword());

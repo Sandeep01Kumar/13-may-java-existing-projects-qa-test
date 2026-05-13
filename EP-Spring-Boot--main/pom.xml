@@ -74,6 +74,21 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!--
+			spring-boot-starter-validation pulls in hibernate-validator
+			(Jakarta Bean Validation 3.0 reference implementation) so the
+			@Valid / @NotBlank / @Size annotations on the auth request DTOs
+			are evaluated by Spring MVC before AuthController invocations.
+			Without this starter, the bean-validation annotations on
+			RegisterRequestDto and LoginRequestDto would be silently
+			ignored at runtime, leaving the registration endpoint open to
+			the empty-username, empty-password, missing-role, and
+			oversized-username inputs flagged by CP2 issues #2-#5.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
