@@ -67,7 +67,19 @@ class JwtUtilTest {
     @Test
     void tamperedToken_shouldFailParsing() {
         String token = jwtUtil.generateToken(userDetails);
-        String tampered = token.substring(0, token.length() - 1) + "X";
+
+        // Tampering strategy: replace the ENTIRE signature segment with 43 'A' characters,
+        // which decode to a deterministic 32-byte all-zero signature. HMAC-SHA256 of any
+        // non-trivial header.payload with a non-zero key has a ~1 in 2^256 chance of
+        // producing all-zero output, so this tampering is reliably detected.
+        //
+        // The earlier "replace last char with X" scheme was flaky because Base64URL's last
+        // char encodes only the final 4 data bits + 2 padding bits, so ~3 out of 64 possible
+        // original last chars (those whose top 4 bits already match X's top 4 bits — namely
+        // V, W, X) produce IDENTICAL decoded signature bytes after the swap, allowing the
+        // tampered token to wrongly validate.
+        String[] parts = token.split("\\.");
+        String tampered = parts[0] + "." + parts[1] + "." + "A".repeat(parts[2].length());
         System.out.println("[JwtUtilTest] Tampering token; tampered=" + tampered);
 
         try {
