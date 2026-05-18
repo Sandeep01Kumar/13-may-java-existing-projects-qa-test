@@ -41,7 +41,7 @@
 		<!-- Phase 3 (AAP §0.6.1) — Spring Security 6.4.x (parent-managed). Triggers
 		     WebSecurityAutoConfiguration; enables HeadersConfigurer, CorsConfigurationSource,
 		     authorizeHttpRequests, and @PreAuthorize. Closes findings #1, #4, #8, #9, #10.
-		     This is the helmet.js → Spring Security translation defined in AAP §0.1.2/§0.1.3. -->
+		     HTTP security headers are implemented by Spring Security in Checkpoint 3. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
