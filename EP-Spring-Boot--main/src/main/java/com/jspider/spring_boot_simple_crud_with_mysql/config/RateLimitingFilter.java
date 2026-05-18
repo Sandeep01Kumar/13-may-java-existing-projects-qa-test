@@ -182,6 +182,39 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     /**
+     * Clears every per-IP bucket currently held by this filter.
+     *
+     * <p><b>Intent (test-isolation hook).</b> The {@link #buckets} map is a
+     * Spring-singleton field that persists across test methods within the
+     * same Spring test context. Without an explicit reset, the bucket for
+     * {@code 127.0.0.1} (the default {@code MockMvc} remote address) accumulates
+     * token consumption from every prior test in the same class. With a low
+     * test capacity (e.g. {@code @TestPropertySource} capacity=5 on
+     * {@code ProductControllerSecurityTest}), this causes later tests to
+     * receive HTTP 429 even though they are functionally unrelated to rate
+     * limiting. Calling this method from a {@code @BeforeEach} fixture in the
+     * test class restores per-test isolation without resorting to expensive
+     * Spring-context recreation via {@code @DirtiesContext}.
+     *
+     * <p><b>Visibility.</b> {@code public} so that test classes in any package
+     * (e.g. {@code ProductControllerSecurityTest} in the {@code controller}
+     * sub-package) can invoke it via {@code @Autowired}-injected reference.
+     * Production code should NEVER call this method — clearing the rate-
+     * limit map at runtime defeats the purpose of the filter; this is
+     * enforced by code review and documented here.
+     *
+     * <p><b>Thread safety.</b> {@link ConcurrentHashMap#clear()} is atomic
+     * with respect to the map's own internal segments; concurrent calls to
+     * {@link #doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)}
+     * may observe a partial clear (some IPs reset, others not) but no
+     * structural corruption. In a test context there is no concurrent
+     * inbound traffic, so this is a non-issue.
+     */
+    public void clearBuckets() {
+        buckets.clear();
+    }
+
+    /**
      * Derives the per-request bucket key from the inbound request.
      *
      * <p>For a service running on embedded Tomcat with no reverse proxy in
