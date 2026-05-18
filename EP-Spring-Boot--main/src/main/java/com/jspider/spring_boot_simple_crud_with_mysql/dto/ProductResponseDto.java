@@ -22,9 +22,10 @@ import com.jspider.spring_boot_simple_crud_with_mysql.entity.Product;
  * <p><strong>Why all four fields including {@code id}.</strong> Unlike the
  * request DTO (which omits {@code id} to defend against mass assignment), the
  * response DTO must carry {@code id} because clients legitimately need the
- * server-assigned primary key to subsequently address the resource (e.g.
- * {@code GET /product/getProductById/{id}}, {@code PUT /product/updateProduct},
- * {@code DELETE /product/deleteProductById/{id}}). The direction of trust is
+ * server-assigned primary key to subsequently address the resource through
+ * controller paths that actually exist in {@code ProductController}, such as
+ * {@code GET /product/getProduct/{id}} and
+ * {@code PUT /product/updateProduct/{id}}. The direction of trust is
  * inverted: on the response side the server is the authoritative producer of
  * {@code id}, so emitting it is correct and necessary.
  *

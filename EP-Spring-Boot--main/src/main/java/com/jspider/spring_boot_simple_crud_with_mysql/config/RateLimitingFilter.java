@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -89,29 +88,19 @@ import jakarta.servlet.http.HttpServletResponse;
  * </ol>
  *
  * <h2>Configuration-properties enablement</h2>
- * <p>This class is annotated with
- * {@code @EnableConfigurationProperties(RateLimitingProperties.class)} as a
- * defensive co-enablement of its own dependency. The canonical location for
- * this annotation per AAP &sect;0.6.1 is the {@code SecurityConfig} class,
- * which is created by a separate agent in the security-fix initiative. Placing
- * the annotation here in addition makes this filter self-sufficient: it can be
- * loaded into any Spring context that component-scans this package without
- * requiring {@code SecurityConfig} to already be present, and the bean wiring
- * of {@link RateLimitingProperties} is guaranteed.
- * <p>Spring deduplicates {@code @EnableConfigurationProperties} target classes
- * via {@code EnableConfigurationPropertiesRegistrar.registerBeanDefinition}'s
- * {@code containsBeanDefinition} check, so duplicate declarations across
- * multiple classes (e.g. here and on {@code SecurityConfig}) are idempotent
- * and do NOT trigger a {@code BeanDefinitionOverrideException}. See
- * {@link EnableConfigurationProperties} and the registrar's source in
- * {@code spring-boot-autoconfigure} for the implementation detail.
+ * <p>The {@link RateLimitingProperties} bean used by this filter is registered
+ * canonically by the {@code SecurityConfig} class via
+ * {@code @EnableConfigurationProperties(RateLimitingProperties.class)} (per
+ * AAP &sect;0.6.1). This filter intentionally does NOT carry its own copy of
+ * that annotation: keeping the registration on a single configuration class
+ * preserves the single-source-of-truth property the AAP specifies and avoids
+ * exposing configuration-binding concerns from a security enforcement
+ * component.
  *
  * @see RateLimitingProperties
  * @see OncePerRequestFilter
- * @see EnableConfigurationProperties
  */
 @Component
-@EnableConfigurationProperties(RateLimitingProperties.class)
 public class RateLimitingFilter extends OncePerRequestFilter {
 
     /**
@@ -142,9 +131,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
      *
      * <p>No {@code @Autowired} is needed: Spring 4.3+ auto-wires the single
      * declared constructor of a stereotype-annotated component. The
-     * {@link RateLimitingProperties} bean is registered by the class-level
-     * {@link EnableConfigurationProperties} annotation on this filter (and
-     * canonically also by {@code SecurityConfig}; see the "Configuration-properties
+     * {@link RateLimitingProperties} bean is registered by
+     * {@code @EnableConfigurationProperties(RateLimitingProperties.class)} on
+     * the {@code SecurityConfig} class (see the "Configuration-properties
      * enablement" section of the class-level Javadoc).
      *
      * @param properties the tunable rate-limit parameters; never {@code null}
@@ -179,39 +168,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         } else {
             writeTooManyRequests(response);
         }
-    }
-
-    /**
-     * Clears every per-IP bucket currently held by this filter.
-     *
-     * <p><b>Intent (test-isolation hook).</b> The {@link #buckets} map is a
-     * Spring-singleton field that persists across test methods within the
-     * same Spring test context. Without an explicit reset, the bucket for
-     * {@code 127.0.0.1} (the default {@code MockMvc} remote address) accumulates
-     * token consumption from every prior test in the same class. With a low
-     * test capacity (e.g. {@code @TestPropertySource} capacity=5 on
-     * {@code ProductControllerSecurityTest}), this causes later tests to
-     * receive HTTP 429 even though they are functionally unrelated to rate
-     * limiting. Calling this method from a {@code @BeforeEach} fixture in the
-     * test class restores per-test isolation without resorting to expensive
-     * Spring-context recreation via {@code @DirtiesContext}.
-     *
-     * <p><b>Visibility.</b> {@code public} so that test classes in any package
-     * (e.g. {@code ProductControllerSecurityTest} in the {@code controller}
-     * sub-package) can invoke it via {@code @Autowired}-injected reference.
-     * Production code should NEVER call this method — clearing the rate-
-     * limit map at runtime defeats the purpose of the filter; this is
-     * enforced by code review and documented here.
-     *
-     * <p><b>Thread safety.</b> {@link ConcurrentHashMap#clear()} is atomic
-     * with respect to the map's own internal segments; concurrent calls to
-     * {@link #doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)}
-     * may observe a partial clear (some IPs reset, others not) but no
-     * structural corruption. In a test context there is no concurrent
-     * inbound traffic, so this is a non-issue.
-     */
-    public void clearBuckets() {
-        buckets.clear();
     }
 
     /**

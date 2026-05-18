@@ -1,27 +1,30 @@
 package com.jspider.spring_boot_simple_crud_with_mysql.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jspider.spring_boot_simple_crud_with_mysql.config.RateLimitingFilter;
 import com.jspider.spring_boot_simple_crud_with_mysql.dto.ProductRequestDto;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -48,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@DirtiesContext(classMode = ClassMode.BEFORE_EACH_TEST_METHOD)
 @TestPropertySource(properties = {
     "app.security.rate-limit.capacity=5",
     "app.security.rate-limit.refill-tokens=5",
@@ -60,37 +64,6 @@ class ProductControllerSecurityTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private RateLimitingFilter rateLimitingFilter;
-
-    /**
-     * Test-isolation fixture &mdash; resets the per-IP rate-limit bucket map
-     * before every test method.
-     *
-     * <p><b>Why this is needed:</b> {@link RateLimitingFilter} is a Spring
-     * singleton whose internal {@code ConcurrentHashMap<String, Bucket>}
-     * persists across test methods sharing the same Spring test context. Every
-     * MockMvc request originates from {@code 127.0.0.1} (the default
-     * {@code MockHttpServletRequest} remote address), so all tests share a
-     * single bucket. Combined with this class's
-     * {@code @TestPropertySource(properties = "app.security.rate-limit.capacity=5")},
-     * the bucket is depleted within the first few requests of the test run
-     * and every subsequent test would receive HTTP 429 unrelated to its
-     * intent. {@link RateLimitingFilter#clearBuckets()} resets the map so each
-     * test starts with a full bucket, restoring the "tests are independent
-     * and stateless" property the AAP &sect;0.8.1 specification assumes.
-     *
-     * <p><b>Why not {@code @DirtiesContext}:</b> recreating the entire Spring
-     * context before each test would cost ~2&nbsp;seconds per method, inflating
-     * the test suite from a few seconds to a few minutes. The targeted
-     * {@link RateLimitingFilter#clearBuckets()} call costs microseconds and
-     * has the same isolation effect.
-     */
-    @BeforeEach
-    void resetRateLimiterBuckets() {
-        rateLimitingFilter.clearBuckets();
-    }
 
     @Test
     @WithMockUser(roles = "USER")
@@ -147,7 +120,9 @@ class ProductControllerSecurityTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
-            .andExpect(status().is2xxSuccessful());
+            .andExpect(status().is2xxSuccessful())
+            .andExpect(jsonPath("$.statusCode").value(200))
+            .andExpect(jsonPath("$.data.id", not(equalTo(999))));
     }
 
     @Test
@@ -156,7 +131,8 @@ class ProductControllerSecurityTest {
         // With @TestPropertySource capacity=5, the first 5 requests succeed.
         // The 6th request triggers HTTP 429 Too Many Requests.
         for (int i = 0; i < 5; i++) {
-            mockMvc.perform(get("/product/findAllProduct"));
+            mockMvc.perform(get("/product/findAllProduct"))
+                .andExpect(status().is2xxSuccessful());
         }
         mockMvc.perform(get("/product/findAllProduct"))
             .andExpect(status().isTooManyRequests())
