@@ -64,8 +64,19 @@ class SecurityConfigTest {
      *
      * <p>The {@code @WithMockUser} annotation injects a mock authenticated principal so the
      * request bypasses the {@code anyRequest().authenticated()} gate and the response is
-     * 2xx. {@code HeadersConfigurer} writes the seven helmet.js-equivalent headers on every
+     * 2xx. {@code HeadersConfigurer} writes the helmet.js-equivalent headers on every
      * response regardless of body content.
+     *
+     * <p><b>Why {@code .secure(true)} on the MockMvc request:</b> Spring Security's default
+     * {@code HstsHeaderWriter} emits {@code Strict-Transport-Security} ONLY on secure (HTTPS)
+     * requests &mdash; this is the canonical, production-correct behavior because HSTS is a
+     * no-op (and arguably misleading) over plaintext HTTP. {@code MockMvc} requests default
+     * to {@code secure=false}, so without this builder flag the HSTS assertion would fail
+     * even when {@code SecurityConfig} is wired correctly. The flag simulates the HTTPS
+     * context that production traffic on port 8443 always satisfies, allowing the test to
+     * verify Spring Security's default HSTS behavior rather than forcing
+     * {@code SecurityConfig} to emit HSTS over insecure requests (which would weaken the
+     * application's security posture solely to satisfy the test).
      *
      * <p>Hamcrest {@code containsString} matchers are used for {@code Strict-Transport-Security}
      * and {@code Content-Security-Policy} to avoid coupling tests to exact configured values
@@ -76,7 +87,7 @@ class SecurityConfigTest {
     @Test
     @WithMockUser
     void securityHeadersArePresent() throws Exception {
-        mockMvc.perform(get("/product/findAllProduct"))
+        mockMvc.perform(get("/product/findAllProduct").secure(true))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
