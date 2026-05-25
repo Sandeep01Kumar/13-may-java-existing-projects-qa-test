@@ -14,6 +14,8 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
+import jakarta.annotation.PostConstruct;
+
 // Rule Applied
 @Service
 public class JwtService {
@@ -24,6 +26,17 @@ public class JwtService {
 	@Value("${jwt.expiration-ms}")
 	private long expirationMs;
 
+	// Cached HMAC-SHA signing key derived from the externalized Base64-encoded
+	// jwt.secret. Initialized once at startup via @PostConstruct so that the
+	// Base64 decode and key construction do not run on every sign/parse call.
+	private SecretKey signingKey;
+
+	@PostConstruct
+	void initSigningKey() {
+		System.out.println("JwtService.initSigningKey: decoding configured jwt.secret and caching SecretKey");
+		this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+	}
+
 	public String generateToken(UserDetails userDetails) {
 		System.out.println("JwtService.generateToken called for user: " + userDetails.getUsername());
 		String role = userDetails.getAuthorities().stream()
@@ -32,12 +45,16 @@ public class JwtService {
 				.orElse("");
 		Date now = new Date();
 		Date expiry = new Date(now.getTime() + expirationMs);
+		// Explicitly sign with HS256 to satisfy AAP requirement #3. Without the
+		// explicit algorithm, jjwt 0.13.0 auto-selects the strongest HMAC variant
+		// supported by the key length (HS512 for a >=64-byte secret), which
+		// would emit alg=HS512 instead of the required alg=HS256.
 		return Jwts.builder()
 				.subject(userDetails.getUsername())
 				.claim("role", role)
 				.issuedAt(now)
 				.expiration(expiry)
-				.signWith(getSigningKey())
+				.signWith(getSigningKey(), Jwts.SIG.HS256)
 				.compact();
 	}
 
@@ -69,6 +86,9 @@ public class JwtService {
 
 	private SecretKey getSigningKey() {
 		System.out.println("JwtService.getSigningKey called");
-		return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+		// Return the cached SecretKey populated by @PostConstruct so each
+		// sign/parse path avoids re-running Base64 decode and HMAC key
+		// construction on every authenticated request.
+		return signingKey;
 	}
 }

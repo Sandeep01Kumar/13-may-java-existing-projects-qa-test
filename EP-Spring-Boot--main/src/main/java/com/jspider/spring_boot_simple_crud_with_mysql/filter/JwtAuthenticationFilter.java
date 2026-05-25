@@ -50,12 +50,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 
 		if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-			UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-			if (jwtService.isTokenValid(token, userDetails)) {
-				UsernamePasswordAuthenticationToken authToken =
-						new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-				authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-				SecurityContextHolder.getContext().setAuthentication(authToken);
+			// Wrap user lookup and token validation in a try/catch so that
+			// expected authentication failures (e.g. a validly-signed token
+			// whose subject no longer exists in the users table) do NOT
+			// propagate as runtime exceptions. Without this guard the
+			// UsernameNotFoundException thrown by CustomUserDetailsService
+			// would bubble out of the filter chain and trigger Spring's
+			// /error dispatch with a logged stack trace before the normal
+			// 401 response from JwtAuthEntryPoint could be issued.
+			try {
+				UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+				if (jwtService.isTokenValid(token, userDetails)) {
+					UsernamePasswordAuthenticationToken authToken =
+							new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+					authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+					SecurityContextHolder.getContext().setAuthentication(authToken);
+				}
+			} catch (Exception e) {
+				// Log a single, generic message (no stack trace) and leave
+				// the SecurityContext unauthenticated. The downstream
+				// AuthorizationFilter will then route the unauthenticated
+				// request through JwtAuthEntryPoint, producing the standard
+				// 401 JSON response for the originally requested path.
+				System.out.println("JwtAuthenticationFilter: authentication failed for token subject '"
+						+ username + "': " + e.getMessage());
+				SecurityContextHolder.clearContext();
 			}
 		}
 
