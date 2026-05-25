@@ -32,38 +32,39 @@ public class SecurityConfig {
 	CustomUserDetailsService customUserDetailsService;
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-		System.out.println("SecurityConfig.securityFilterChain initializing stateless JWT filter chain");
-		http
-				.csrf(csrf -> csrf.disable())
-				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-						.anyRequest().authenticated())
-				.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.exceptionHandling(eh -> eh.authenticationEntryPoint(jwtAuthEntryPoint))
-				.authenticationProvider(daoAuthenticationProvider())
-				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-		return http.build();
-	}
-
-	@Bean
 	public PasswordEncoder passwordEncoder() {
-		System.out.println("SecurityConfig.passwordEncoder providing BCryptPasswordEncoder bean");
+		System.out.println("SecurityConfig.passwordEncoder: creating BCryptPasswordEncoder bean");
 		return new BCryptPasswordEncoder();
 	}
 
 	@Bean
 	public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-		System.out.println("SecurityConfig.authenticationManager exposing AuthenticationManager bean");
+		System.out.println("SecurityConfig.authenticationManager: exposing AuthenticationManager bean");
 		return config.getAuthenticationManager();
 	}
 
 	@Bean
 	public DaoAuthenticationProvider daoAuthenticationProvider() {
-		System.out.println("SecurityConfig.daoAuthenticationProvider wiring CustomUserDetailsService and BCrypt");
+		System.out.println("SecurityConfig.daoAuthenticationProvider: wiring CustomUserDetailsService + BCryptPasswordEncoder");
 		DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
 		provider.setUserDetailsService(customUserDetailsService);
 		provider.setPasswordEncoder(passwordEncoder());
 		return provider;
+	}
+
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		System.out.println("SecurityConfig.securityFilterChain: configuring stateless JWT security");
+		http
+			.csrf(csrf -> csrf.disable())
+			.authorizeHttpRequests(auth -> auth
+				.requestMatchers("/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+				.anyRequest().authenticated()
+			)
+			.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.exceptionHandling(eh -> eh.authenticationEntryPoint(jwtAuthEntryPoint))
+			.authenticationProvider(daoAuthenticationProvider())
+			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+		return http.build();
 	}
 }
