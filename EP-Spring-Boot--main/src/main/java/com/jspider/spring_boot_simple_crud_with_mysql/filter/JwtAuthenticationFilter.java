@@ -3,7 +3,6 @@ package com.jspider.spring_boot_simple_crud_with_mysql.filter;
 import java.io.IOException;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,8 +22,6 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-	private static final String BEARER_PREFIX = "Bearer ";
-
 	@Autowired
 	JwtService jwtService;
 
@@ -32,30 +29,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	CustomUserDetailsService customUserDetailsService;
 
 	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-			throws ServletException, IOException {
-		System.out.println("JwtAuthenticationFilter.doFilterInternal called for: " + request.getRequestURI());
-		String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-		if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+			FilterChain chain) throws ServletException, IOException {
+		System.out.println("JwtAuthenticationFilter.doFilterInternal: " + request.getMethod() + " " + request.getRequestURI());
+
+		String authHeader = request.getHeader("Authorization");
+		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
 			chain.doFilter(request, response);
 			return;
 		}
-		String token = authHeader.substring(BEARER_PREFIX.length());
+
+		String token = authHeader.substring(7);
+		String username = null;
 		try {
-			String username = jwtService.extractUsername(token);
-			if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-				UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-				if (jwtService.isTokenValid(token, userDetails)) {
-					UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-							userDetails, null, userDetails.getAuthorities());
-					authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-					SecurityContextHolder.getContext().setAuthentication(authentication);
-				}
-			}
-		} catch (Exception ex) {
-			System.out.println("JwtAuthenticationFilter token validation failed: " + ex.getMessage());
-			SecurityContextHolder.clearContext();
+			username = jwtService.extractUsername(token);
+		} catch (Exception e) {
+			System.out.println("JwtAuthenticationFilter: token parsing failed: " + e.getMessage());
+			chain.doFilter(request, response);
+			return;
 		}
+
+		if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+			UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+			if (jwtService.isTokenValid(token, userDetails)) {
+				UsernamePasswordAuthenticationToken authToken =
+						new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+				authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+				SecurityContextHolder.getContext().setAuthentication(authToken);
+			}
+		}
+
 		chain.doFilter(request, response);
 	}
 }
