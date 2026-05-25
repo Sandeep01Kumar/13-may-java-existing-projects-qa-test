@@ -64,7 +64,21 @@ public class SecurityConfig {
 			// to cross-site requests.
 			.csrf(csrf -> csrf.disable())
 			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+				// "/error" is the internal Spring Boot dispatcher target
+				// for any unhandled exception. Without permitting it
+				// here, an exception thrown by an /auth/** endpoint
+				// (e.g. duplicate username RuntimeException, malformed
+				// JSON, wrong Content-Type, HttpRequestMethodNotSupported)
+				// is forwarded to /error, which has no Authorization
+				// header, so the AuthorizationFilter routes the response
+				// through JwtAuthEntryPoint and emits a misleading
+				// "401 Unauthorized" with path:"/error". Permitting
+				// /error here ensures GlobalExceptionHandler's
+				// @ExceptionHandler methods are the source of truth for
+				// the final response status and body — fixing the
+				// QA finding F-1 ("misleading 401 via /error security
+				// leak").
+				.requestMatchers("/auth/**", "/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.anyRequest().authenticated()
 			)
 			// STATELESS session creation policy ensures Spring Security never

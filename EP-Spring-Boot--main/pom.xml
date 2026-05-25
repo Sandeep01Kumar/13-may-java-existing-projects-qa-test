@@ -75,6 +75,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!--
+			spring-boot-starter-validation brings Jakarta Bean Validation 3.0
+			(Hibernate Validator) onto the classpath so DTOs annotated with
+			@NotBlank/@Size and controller methods annotated with @Valid will
+			be enforced before the request reaches the service layer. This
+			converts what used to be silent acceptance of blank/null fields
+			(QA finding F-2) into a 400 Bad Request handled by
+			GlobalExceptionHandler.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
